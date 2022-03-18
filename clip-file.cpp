@@ -55,36 +55,48 @@ bool process( const char* filename )
 {
    if ( ::IsClipboardFormatAvailable( CF_TEXT ) && ::OpenClipboard( NULL ) )
    {
+      ::EmptyClipboard();
+
       // Use try...finally to make sure we close the clipboard after use
       //__try
       {
-         std::ifstream file( filename );
-         std::stringstream buffer;
-         buffer << file.rdbuf();
+         std::ifstream t;
+         size_t length;
+         t.open( filename );      // open input file
+         t.seekg( 0, std::ios::end );    // go to the end
+         length = t.tellg();           // report location (this is the length)
+         t.seekg( 0, std::ios::beg );    // go back to the beginning
+         char* buffer = new char[ length + 1 ];    // allocate memory for a buffer of appropriate dimension
+         t.read( buffer, length );       // read the whole file into the buffer
+         t.close();                    // close file handle
 
-         HANDLE h = GlobalAlloc( GMEM_MOVEABLE,
-                                 ( buffer.str().length() + 1 ) * sizeof( TCHAR ) );
+         buffer[ length ] = '\0';
+
+         HGLOBAL h = GlobalAlloc( GMEM_MOVEABLE | GMEM_DDESHARE,
+                                  ( length + 10 ) );
 
          if ( h != NULL )
          {
-            LPTSTR v = (LPTSTR) ::GlobalLock( h );
+            char* v = (char*) ::GlobalLock( h );
 
             if ( v != NULL )
             {
-               memcpy( v, buffer.str().c_str(), buffer.str().length() * sizeof( TCHAR ) );
-               v[ buffer.str().length() ] = (BYTE) '\0';
+               memcpy( v, buffer, length );
+               v[ length ] = '\0';
 
                ::GlobalUnlock( v );
-               ::SetClipboardData( CF_TEXT, h );
+
+               if ( !::SetClipboardData( CF_TEXT, h ) )
+               {
+                  std::cerr << "Failed to set text onto clipboard" << std::endl;
+               }
             }
 
             ::GlobalFree( h );
          }
       }
-      //__finally
-      {
-         ::CloseClipboard();
-      }
+
+      ::CloseClipboard();
    }
    else
    {
