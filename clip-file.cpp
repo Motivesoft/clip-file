@@ -68,12 +68,17 @@ bool process( const char* filename )
          if ( h != NULL )
          {
             LPTSTR v = (LPTSTR) ::GlobalLock( h );
-            memcpy( v, buffer.str().c_str(), buffer.str().length() * sizeof( TCHAR ) );
-            v[ buffer.str().length() ] = (BYTE) '\0';
-            GlobalUnlock( v );
 
-            ::SetClipboardData( CF_TEXT, h );
-            GlobalFree( h );
+            if ( v != NULL )
+            {
+               memcpy( v, buffer.str().c_str(), buffer.str().length() * sizeof( TCHAR ) );
+               v[ buffer.str().length() ] = (BYTE) '\0';
+
+               ::GlobalUnlock( v );
+               ::SetClipboardData( CF_TEXT, h );
+            }
+
+            ::GlobalFree( h );
          }
       }
       //__finally
