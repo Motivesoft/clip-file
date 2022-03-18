@@ -1,7 +1,10 @@
 // clip-file.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
+#include <sstream>
+#include <fstream>
 #include <iostream>
+#include <windows.h>
 
 void usage( const char* appName )
 {
@@ -50,6 +53,39 @@ bool isHelpRequest( const char* argument )
 
 bool process( const char* filename )
 {
+   if ( ::IsClipboardFormatAvailable( CF_TEXT ) && ::OpenClipboard( NULL ) )
+   {
+      // Use try...finally to make sure we close the clipboard after use
+      //__try
+      {
+         std::ifstream file( filename );
+         std::stringstream buffer;
+         buffer << file.rdbuf();
+
+         HANDLE h = GlobalAlloc( GMEM_MOVEABLE,
+                                 ( buffer.str().length() + 1 ) * sizeof( TCHAR ) );
+
+         if ( h != NULL )
+         {
+            LPTSTR v = (LPTSTR) ::GlobalLock( h );
+            memcpy( v, buffer.str().c_str(), buffer.str().length() * sizeof( TCHAR ) );
+            v[ buffer.str().length() ] = (BYTE) '\0';
+            GlobalUnlock( v );
+
+            ::SetClipboardData( CF_TEXT, h );
+            GlobalFree( h );
+         }
+      }
+      //__finally
+      {
+         ::CloseClipboard();
+      }
+   }
+   else
+   {
+      std::cerr << "Clipboard is inaccessible" << std::endl;
+   }
+
    return true;
 }
 
@@ -78,19 +114,4 @@ int main( int argc, char** argv )
    {
       help( appName );
    }
-   else
-   {
-
-   }
 }
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
