@@ -3,16 +3,85 @@
 
 #include <iostream>
 
-int main( int argc, char** argv )
+void usage( const char* appName )
 {
-   std::cout << argv[ 0 ] << std::endl << std::endl;
+   std::cout << std::endl;
+   std::cout << "Usage:" << std::endl;
+   std::cout << "    " << appName << "<filename>" << std::endl;
+   std::cout << std::endl;
+}
 
-   for ( int loop = 1; loop < argc; loop++ )
+void help( const char* appName )
+{
+   std::cout << std::endl;
+   std::cout << "Copy the contents of a file to the clipboard." << std::endl;
+
+   usage( appName );
+}
+
+bool isHelpRequest( const char* argument )
+{
+   if ( argument != NULL && strlen( argument ) > 1 )
    {
-      std::cout << argv[ loop ] << std::endl;
+      if ( argument[ 0 ] == '/' || argument[ 0 ] == '-' )
+      {
+         const char* helpRequests[] =
+         {
+            "-h",
+            "-help",
+            "-?",
+            "/h",
+            "/help",
+            "/?",
+         };
+
+         for ( int loop = 0; loop < _countof( helpRequests ); loop++ )
+         {
+            if ( _stricmp( helpRequests[ loop ], argument ) == 0 )
+            {
+               return true;
+            }
+         }
+      }
    }
 
-   std::cout << std::endl << "Done" << std::endl;
+   return false;
+}
+
+bool process( const char* filename )
+{
+   return true;
+}
+
+int main( int argc, char** argv )
+{
+   // We're going to be showing an message to the user. Reference the executable name when we do this for usage examples
+   char appName[ _MAX_FNAME ];
+   _splitpath_s( argv[ 0 ], NULL, 0, NULL, 0, appName, _MAX_FNAME, NULL, 0 );
+   _strupr_s( appName, _MAX_FNAME );
+
+   bool showHelp = true;
+
+   if ( argc == 2 )
+   {
+      if ( !isHelpRequest( argv[ 1 ] ) )
+      {
+         showHelp = false;
+         if( !process( argv[ 1 ] ) )
+         {
+            usage( appName );
+         }
+      }
+   }
+
+   if ( showHelp )
+   {
+      help( appName );
+   }
+   else
+   {
+
+   }
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
