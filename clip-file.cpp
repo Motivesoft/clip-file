@@ -1,134 +1,103 @@
-// clip-file.cpp : This file contains the 'main' function. Program execution begins and ends there.
+// clip-file.cpp : Defines the entry point for the application.
 //
 
-#include <sstream>
-#include <fstream>
-#include <iostream>
-#include <windows.h>
+#include "framework.h"
+#include "clip-file.h"
 
-void usage( const char* appName )
+void process( LPWSTR filename )
 {
-   std::cout << std::endl;
-   std::cout << "Usage:" << std::endl;
-   std::cout << "    " << appName << "<filename>" << std::endl;
-   std::cout << std::endl;
-}
+   HANDLE hFile;
+   hFile = CreateFile( filename,              // file to open
+                       GENERIC_READ,          // open for reading
+                       FILE_SHARE_READ,       // share for reading
+                       NULL,                  // default security
+                       OPEN_EXISTING,         // existing file only
+                       FILE_ATTRIBUTE_NORMAL, // normal file
+                       NULL );                // no attr. template
 
-void help( const char* appName )
-{
-   std::cout << std::endl;
-   std::cout << "Copy the contents of a file to the clipboard." << std::endl;
-
-   usage( appName );
-}
-
-bool isHelpRequest( const char* argument )
-{
-   if ( argument != NULL && strlen( argument ) > 1 )
+   if ( hFile != INVALID_HANDLE_VALUE )
    {
-      if ( argument[ 0 ] == '/' || argument[ 0 ] == '-' )
-      {
-         const char* helpRequests[] =
-         {
-            "-h",
-            "-help",
-            "-?",
-            "/h",
-            "/help",
-            "/?",
-         };
+      DWORD extra;
+      DWORD dwSize = GetFileSize( hFile, &extra );
 
-         for ( int loop = 0; loop < _countof( helpRequests ); loop++ )
+      if ( extra > 0 )
+      {
+         MessageBox( NULL, L"File too large", L"Error", MB_OK );
+         CloseHandle( hFile );
+         return;
+      }
+
+      char* buffer = new char[ dwSize + sizeof( char ) ];
+
+      if ( ReadFile( hFile, buffer, dwSize, NULL, NULL ) )
+      {
+         if ( ::IsClipboardFormatAvailable( CF_TEXT ) && ::OpenClipboard( NULL ) )
          {
-            if ( _stricmp( helpRequests[ loop ], argument ) == 0 )
+            ::EmptyClipboard();
+
+            HGLOBAL h = GlobalAlloc( GMEM_MOVEABLE | GMEM_DDESHARE,
+                                     ( dwSize + 10 ) );
+            if ( h != NULL )
             {
-               return true;
+               char* v = ( char* ) ::GlobalLock( h );
+
+               if ( v != NULL )
+               {
+                  memcpy( v, buffer, dwSize );
+                  v[ dwSize ] = '\0';
+
+                  ::GlobalUnlock( v );
+
+                  if ( !::SetClipboardData( CF_TEXT, h ) )
+                  {
+                     MessageBox( NULL, L"Failed to read file", L"Error", MB_OK );
+                  }
+               }
+
+               ::GlobalFree( h );
             }
+
+            ::CloseClipboard();
          }
+      }
+      else
+      {
+         MessageBox( NULL, filename, L"Failed to read file", MB_OK );
+      }
+
+      delete[] buffer;
+      CloseHandle( hFile );
+   }
+}
+
+int APIENTRY wWinMain( _In_ HINSTANCE hInstance,
+                       _In_opt_ HINSTANCE hPrevInstance,
+                       _In_ LPWSTR    lpCmdLine,
+                       _In_ int       nCmdShow )
+{
+   UNREFERENCED_PARAMETER( hInstance );
+   UNREFERENCED_PARAMETER( hPrevInstance );
+
+   // Extract the filename and remove surrounding quotes if present
+   LPWSTR filename = lpCmdLine;
+   if ( wcslen( filename ) > 0 )
+   {
+      if ( filename[ 0 ] == TEXT( '\"' ) )
+      {
+         filename[ wcslen( filename ) - 1 ] = TEXT( '\0' );
+         filename++;
       }
    }
 
-   return false;
-}
-
-bool process( const char* filename )
-{
-   if ( ::IsClipboardFormatAvailable( CF_TEXT ) && ::OpenClipboard( NULL ) )
+   // Now load the file
+   if ( wcslen( filename ) > 0 )
    {
-      ::EmptyClipboard();
-
-      // Use try...finally to make sure we close the clipboard after use
-      //__try
-      {
-         std::ifstream t;
-         size_t length;
-         t.open( filename );      // open input file
-         t.seekg( 0, std::ios::end );    // go to the end
-         length = t.tellg();           // report location (this is the length)
-         t.seekg( 0, std::ios::beg );    // go back to the beginning
-         char* buffer = new char[ length + 1 ];    // allocate memory for a buffer of appropriate dimension
-         t.read( buffer, length );       // read the whole file into the buffer
-         t.close();                    // close file handle
-
-         buffer[ length ] = '\0';
-
-         HGLOBAL h = GlobalAlloc( GMEM_MOVEABLE | GMEM_DDESHARE,
-                                  ( length + 10 ) );
-
-         if ( h != NULL )
-         {
-            char* v = (char*) ::GlobalLock( h );
-
-            if ( v != NULL )
-            {
-               memcpy( v, buffer, length );
-               v[ length ] = '\0';
-
-               ::GlobalUnlock( v );
-
-               if ( !::SetClipboardData( CF_TEXT, h ) )
-               {
-                  std::cerr << "Failed to set text onto clipboard" << std::endl;
-               }
-            }
-
-            ::GlobalFree( h );
-         }
-      }
-
-      ::CloseClipboard();
+      process( filename );
    }
    else
    {
-      std::cerr << "Clipboard is inaccessible" << std::endl;
+      MessageBox( NULL, L"Specify filename as a command line argument and the file contents will be placed onto the clipboard", L"Help", MB_OK );
    }
 
-   return true;
-}
-
-int main( int argc, char** argv )
-{
-   // We're going to be showing an message to the user. Reference the executable name when we do this for usage examples
-   char appName[ _MAX_FNAME ];
-   _splitpath_s( argv[ 0 ], NULL, 0, NULL, 0, appName, _MAX_FNAME, NULL, 0 );
-   _strupr_s( appName, _MAX_FNAME );
-
-   bool showHelp = true;
-
-   if ( argc == 2 )
-   {
-      if ( !isHelpRequest( argv[ 1 ] ) )
-      {
-         showHelp = false;
-         if( !process( argv[ 1 ] ) )
-         {
-            usage( appName );
-         }
-      }
-   }
-
-   if ( showHelp )
-   {
-      help( appName );
-   }
+   return 0;
 }
