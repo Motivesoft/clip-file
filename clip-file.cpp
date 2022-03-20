@@ -36,7 +36,7 @@ void process( LPWSTR filename )
             ::EmptyClipboard();
 
             HGLOBAL h = GlobalAlloc( GMEM_MOVEABLE | GMEM_DDESHARE,
-                                     ( dwSize + 10 ) );
+                                     ( (SIZE_T) dwSize + 10 ) );
             if ( h != NULL )
             {
                char* v = ( char* ) ::GlobalLock( h );
@@ -92,6 +92,7 @@ int APIENTRY wWinMain( _In_ HINSTANCE hInstance,
    // Now load the file
    if ( wcslen( filename ) > 0 )
    {
+      //MessageBox( NULL, filename, L"Filename", MB_OK );
       process( filename );
    }
    else
